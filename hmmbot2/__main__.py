@@ -14,23 +14,20 @@ class Hmmbot(discord.Client):
         if message.author == self.user:
             return
 
-        tokens = Parser(message.content).parse()
+        expressions = Parser(message.content).parse()
 
-        # Check for tokens that initiate the command.
-        for initiator in ["bot", "do"]:
-            try:
-                if tokens.pop(0) != initiator:
-                    return
-            except: # pop failed; not enough tokens
-                return
+        # Commands start with a "bot;" expression.
+        if not expressions or expressions[0] != ["bot"]:
+            return
 
-        if tokens: # not empty
-            # Enclose everything in fancy code tags.
-            response = "tokens:\n```\n"
-            response += "\n".join(tokens)
-            response += "\n```"
+        # Just the initial "bot;" expression.
+        if len(expressions) == 1:
+            response = "wtf, you mf"
         else:
-            response = "wtf did you just do"
+            response = "you told me to:"
+
+            for tokens in expressions[1:]:
+                response += "\n" + " ".join(tokens)
 
         await message.channel.send(response)
 

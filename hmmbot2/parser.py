@@ -24,28 +24,42 @@ class Parser:
     def next(self, n=1):
         self.__position += n
 
-    def parse(self):
-        tokens = []
-
-        # Discord doesn't allow empty messages, so this will be filled
-        # in, one way or another.
-        current_token = ""
-
+    # Parse the next token and return it.
+    def next_token(self):
         # Characters that separate tokens.
         separators = (" ", "\t", "\n", "\r")
 
-        while not self.eobp():
+        token = ""
+
+        while True:
+            # End abruptly on expression separator or end of buffer.
+            if self.char() == ";" or self.eobp():
+                return token
+
             if self.char() in separators:
-                # Ignore multiple separators in a row.
-                if self.last() not in separators:
-                    tokens.append(current_token)
-                    current_token = ""
+                # Ignore leading separators or multiple in a row.
+                if token and self.last() not in separators:
+                    self.next()
+                    return token
             else:
-                current_token += self.char()
+                token += self.char()
 
             self.next()
 
-        # Trailing newlines are trimmed, so terminate the sequence.
-        tokens.append(current_token)
+    # Parse the given code and return a list of expressions from it.
+    # Each expression is, in turn, a list of tokens.
+    def parse(self):
+        expressions = []
 
-        return tokens
+        while not self.eobp():
+            tokens = []
+
+            # ';' is the expression separator.
+            while self.char() != ";" and not self.eobp():
+                tokens.append(self.next_token())
+
+            self.next()
+
+            expressions.append(tokens)
+
+        return expressions
