@@ -33,15 +33,32 @@ class Hmmbot(discord.Client):
             if not expression:
                 continue
 
-            for clazz in command_classes:
-                command = clazz(self, expressions)
+            # Try to match command names with the first token.
+            for command_name, clazz in command_classes.items():
+                command = clazz(self)
 
                 if command.probe(expression): # a valid avatar command
                     result = command.execute() # execute with "probed" args
                     output.append(result)
                     break
-            else: # none of the commands worked
-                output = ["?"]
+            else: # none of the commands worked; try the built-ins
+                try:
+                    # Pipe the output of the previous command.
+                    if expression[0] == "into":
+                        # Syntax: "into" command_name
+                        assert len(expression) == 2
+                        command_name = expression[1]
+
+                        command = command_classes[command_name](self)
+
+                        # Consume the last piece of output and add the result.
+                        command.pipe(output.pop())
+                        output.append(command.execute())
+                    else:
+                        raise
+                except:
+                    # A very meaningful, ed-style error message.
+                    output = ["?"]
 
         files = []
 

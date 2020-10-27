@@ -1,4 +1,4 @@
-from abc import ABC, ABCMeta, abstractmethod
+from abc import ABC, ABCMeta, abstractmethod, abstractclassmethod
 from io import BytesIO
 
 import re
@@ -6,26 +6,25 @@ import re
 from wand.image import Image
 import requests
 
-command_classes = []
+command_classes = {}
 
 # A metaclass that populates `command_classes`.
 class SubclassWatcher(ABCMeta):
     def __init__(cls, name, bases, clsdict):
         super(SubclassWatcher, cls).__init__(name, bases, clsdict)
 
-        if len(cls.mro()) > 3: # inherited `Command`
-            command_classes.append(cls)
+        if len(cls.mro()) > 3: # if inherited `Command`
+            command_classes[cls.identifier(cls)] = cls
 
 class Command(ABC, metaclass=SubclassWatcher):
-    # Return a command on `client` in response to `message`.
-    def __init__(self, client, message):
+    # Return a command on `client`.
+    def __init__(self, client):
         self.client = client
-        self.message = message
         self.args = None
 
     # Return the command's identifier as string.
-    @abstractmethod
-    def identifier(self):
+    @abstractclassmethod
+    def identifier(cls):
         pass
 
     # "Probe" the command to see if it can be executed in the given expression.
@@ -42,30 +41,40 @@ class Command(ABC, metaclass=SubclassWatcher):
         self.args = expression[1:]
         return True
 
+    # Pipe the last command's output into the current.
+    def pipe(self, last_output):
+        self.args = [last_output]
+
     # Execute the command with previously probed arguments.
     def execute(self):
         if self.args is None:
             raise RuntimeError("Command hasn't been probed")
 
-        return self.run()
+        try:
+            return self.run()
+        except Exception as err:
+            return "`" + str(err) + "`"
 
     # Run the command. Never call this manually; use `execute` instead!
     @abstractmethod
     def run(self):
         pass
 
-    # Various utilities related to pipes.
-
     # Read an image from the first argument.
     def read_image(self):
         if len(self.args) != 1:
             raise ValueError("Argument count != 1")
 
+        # Already an image.
+        if isinstance(self.args[0], BytesIO):
+            return Image(file=self.args[0])
+
+        # Otherwise, it's a URL we have to download.
         response = requests.get(self.args[0])
         return Image(file=BytesIO(response.content))
 
 class Avatar(Command):
-    def identifier(self):
+    def identifier(cls):
         return "avatar"
 
     def run(self):
@@ -92,22 +101,26 @@ class Avatar(Command):
             return "i don't personally know this user"
 
 class Magik(Command):
-    def identifier(self):
+    def identifier(cls):
         return "magik"
 
     def run(self):
         magik = BytesIO()
 
         try:
-            with self.read_image() as image:
-                image.convert("png")
-                image.resize(800, 800)
-                image.liquid_rescale(400, 400)
-                image.liquid_rescale(1200, 1200)
-                image.save(file=magik)
-
-            magik.seek(0)
+            image = self.read_image()
         except:
             return "that's not one fucking image, you moron"
+
+        image.convert("png")
+
+        image.liquid_rescale(int(image.width * 0.5), int(image.height * 0.5),
+                             delta_x=1, rigidity=0)
+        image.liquid_rescale(int(image.width * 1.5), int(image.height * 1.5),
+                             delta_x=2, rigidity=0)
+
+        image.save(file=magik)
+
+        magik.seek(0)
 
         return magik
