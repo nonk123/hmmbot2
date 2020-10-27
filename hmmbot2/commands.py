@@ -1,6 +1,10 @@
 from abc import ABC, ABCMeta, abstractmethod
+from io import BytesIO
 
 import re
+
+from wand.image import Image
+import requests
 
 command_classes = []
 
@@ -31,11 +35,11 @@ class Command(ABC, metaclass=SubclassWatcher):
             return False
 
         # First token is the command name.
-        if expression.pop(0) != self.identifier():
+        if expression[0] != self.identifier():
             return False
 
         # The rest is the arguments.
-        self.args = expression
+        self.args = expression[1:]
         return True
 
     # Execute the command with previously probed arguments.
@@ -49,6 +53,16 @@ class Command(ABC, metaclass=SubclassWatcher):
     @abstractmethod
     def run(self):
         pass
+
+    # Various utilities related to pipes.
+
+    # Read an image from the first argument.
+    def read_image(self):
+        if len(self.args) != 1:
+            raise ValueError("Argument count != 1")
+
+        response = requests.get(self.args[0])
+        return Image(file=BytesIO(response.content))
 
 class Avatar(Command):
     def identifier(self):
@@ -76,3 +90,24 @@ class Avatar(Command):
             return str(user.avatar_url)
         else: # None because the user has to share the bot's server
             return "i don't personally know this user"
+
+class Magik(Command):
+    def identifier(self):
+        return "magik"
+
+    def run(self):
+        magik = BytesIO()
+
+        try:
+            with self.read_image() as image:
+                image.convert("png")
+                image.resize(800, 800)
+                image.liquid_rescale(400, 400)
+                image.liquid_rescale(1200, 1200)
+                image.save(file=magik)
+
+            magik.seek(0)
+        except:
+            return "that's not one fucking image, you moron"
+
+        return magik
