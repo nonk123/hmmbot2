@@ -10,21 +10,27 @@ class Hmmbot(discord.Client):
         print("Ready")
 
     async def on_message(self, message):
+        # Ignore messages from self.
         if message.author == self.user:
             return
 
         tokens = Parser(message.content).parse()
 
-        # Tokens that initiate the command.
-        initiator = ["bot", "do"]
-
-        for word in initiator:
-            if tokens.pop(0) != word:
+        # Check for tokens that initiate the command.
+        for initiator in ["bot", "do"]:
+            try:
+                if tokens.pop(0) != initiator:
+                    return
+            except: # pop failed; not enough tokens
                 return
 
-        response = "Tokens:\n```\n"
-        response += "\n".join(tokens)
-        response += "\n```"
+        if tokens: # not empty
+            # Enclose everything in fancy code tags.
+            response = "tokens:\n```\n"
+            response += "\n".join(tokens)
+            response += "\n```"
+        else:
+            response = "wtf did you just do"
 
         await message.channel.send(response)
 
