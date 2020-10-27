@@ -3,6 +3,7 @@
 import discord
 
 from .parser import Parser
+from .commands import Avatar
 
 class Hmmbot(discord.Client):
     async def on_ready(self):
@@ -17,19 +18,29 @@ class Hmmbot(discord.Client):
         expressions = Parser(message.content).parse()
 
         # Commands start with a "bot;" expression.
-        if not expressions or expressions[0] != ["bot"]:
+        if not expressions or expressions.pop(0) != ["bot"]:
             return
 
-        # Just the initial "bot;" expression.
-        if len(expressions) == 1:
-            response = "wtf, you mf"
-        else:
-            response = "you told me to:"
+        output = []
 
-            for tokens in expressions[1:]:
-                response += "\n" + " ".join(tokens)
+        for expression in expressions:
+            # Skip empty expressions.
+            if not expression:
+                continue
 
-        await message.channel.send(response)
+            command = Avatar(self, message)
+
+            if command.probe(expression):  # a valid avatar command
+                result = command.execute() # execute with "probed" args
+                output.append(result)
+            else: # can't find command; print ed-style error message
+                output = ["?"]
+                break
+
+        output = "\n".join(output)
+
+        if output: # avoid sending an empty message
+            await message.channel.send(output)
 
 def main():
     Hmmbot().run(open("token.secret").readline())
