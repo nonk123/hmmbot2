@@ -3,7 +3,7 @@
 import discord
 
 from .parser import Parser
-from .commands import Avatar
+from .commands import command_classes
 
 class Hmmbot(discord.Client):
     async def on_ready(self):
@@ -28,14 +28,15 @@ class Hmmbot(discord.Client):
             if not expression:
                 continue
 
-            command = Avatar(self, message)
+            for clazz in command_classes:
+                command = clazz(self, expressions)
 
-            if command.probe(expression):  # a valid avatar command
-                result = command.execute() # execute with "probed" args
-                output.append(result)
-            else: # can't find command; print ed-style error message
+                if command.probe(expression):  # a valid avatar command
+                    result = command.execute() # execute with "probed" args
+                    output.append(result)
+                    break
+            else: # none of the commands worked
                 output = ["?"]
-                break
 
         output = "\n".join(output)
 
